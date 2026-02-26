@@ -217,6 +217,92 @@ int main()
 }
 
 
+
+TEST(TLEOrbitTest, ValidateTLEOrbit_ValidTLE)
+{
+    std::string line1="1 38833U 12053A   26056.13835903 -.00000020  00000+0  00000+0 0  9998";
+    std::string line2="2 38833  53.5651 148.1913 0176842  64.7258 297.1152  2.00565629 97197";
+
+    bool ok = mppe::TLEOrbit::validateTLEOrbit(line1, line2);
+
+    EXPECT_TRUE(ok);
+}
+
+// TEST(TLEOrbitTest, ValidateTLEOrbit_InvalidTLEShortLine)
+// {
+//     std::string line1 = "1 55268U 23009A   26052.32241733  .00000031  00000+0  00000+0 0  9992";
+//     std::string line2 = "2 55268  55.1086 153.0736 0004466 333.1834  51.6500";  // Too short
+
+//     CerrCapture cerr_capture;
+
+//     // Ensure the checksum we set is actually correct:
+//     bool ok = mppe::TLEOrbit::validateTLEOrbit(line1, line2);
+
+//     EXPECT_FALSE(ok);
+//     EXPECT_THAT(cerr_capture.str(), testing::HasSubstr("Error: TLE lines must be at least 69 characters long."));
+// }
+
+// TEST(TLEOrbitTest, ValidateTLEOrbit_InvalidTLEBadChecksum)
+// {
+//     std::string line1 = "1 55268U 23009A   26052.32241733  .00000031  00000+0  00000+0 0  9992";
+//     std::string line2 = "2 55268  55.1086 153.0736 0004466 333.1834  51.6500  2.00549869 22929";  // Invalid checksum
+
+//     CerrCapture cerr_capture;
+
+//     // Ensure the checksum we set is actually correct:
+//     bool ok = mppe::TLEOrbit::validateTLEOrbit(line1, line2);
+
+//     EXPECT_FALSE(ok);
+//     EXPECT_THAT(cerr_capture.str(), testing::HasSubstr("Error: TLE line checksum mismatch"));
+// }
+
+// TEST(TLEOrbitTest, ValidateTLEOrbit_InvalidTLEBadEccentricity)
+// {
+//     std::string line1 = "1 55268U 23009A   26052.32241733  .00000031  00000+0  00000+0 0  9992";
+//     std::string line2 = "2 55268  55.1086 153.0736 1004466 333.1834  51.6500  2.00549869 22929";  // Invalid eccentricity
+
+//     CerrCapture cerr_capture;
+
+//     // Ensure the checksum we set is actually correct:
+//     bool ok = mppe::TLEOrbit::validateTLEOrbit(line1, line2);
+
+//     EXPECT_FALSE(ok);
+//     EXPECT_THAT(
+//         cerr_capture.str(),
+//         testing::HasSubstr(
+//             "Error: Eccentricity in TLE must be a decimal in the range (0,1) represented as a string of digits."));
+// }
+
+// TEST(TLEOrbitTest, ValidateTLEOrbit_InvalidTLEBadInclination)
+// {
+//     std::string line1 = "1 55268U 23009A   26052.32241733  .00000031  00000+0  00000+0 0  9992";
+//     std::string line2 = "2 55268 155.1086 153.0736 0004466 333.1834  51.6500  2.00549869 22929";  // Invalid inclination
+
+//     CerrCapture cerr_capture;
+
+//     // Ensure the checksum we set is actually correct:
+//     bool ok = mppe::TLEOrbit::validateTLEOrbit(line1, line2);
+
+//     EXPECT_FALSE(ok);
+//     EXPECT_THAT(cerr_capture.str(), testing::HasSubstr("Error: Inclination out of range (0-180°)."));
+// }
+
+// TEST(TLEOrbitTest, TLEOrbitTest_ValidateTLEOrbit_InvalidMeanMotion)
+// {
+//     std::string line1 = "1 55268U 23009A   26052.32241733  .00000031  00000+0  00000+0 0  9992";
+//     std::string line2 = "2 55268 155.1086 153.0736 0004466 333.1834  51.6500 -2.00549869 22929";  // Invalid mean motion
+
+//     CerrCapture cerr_capture;
+
+//     // Ensure the checksum we set is actually correct:
+//     bool ok = mppe::TLEOrbit::validateTLEOrbit(line1, line2);
+
+//     EXPECT_FALSE(ok);
+//     EXPECT_THAT(cerr_capture.str(), testing::HasSubstr("Error: Mean motion must be positive."));
+
+// } 
+
+
 # 1️⃣ Bad Checksums
 1 25544U 98067A   24045.51782528  .00016717  00000-0  10270-3 0  9991
 2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.50012345234560
