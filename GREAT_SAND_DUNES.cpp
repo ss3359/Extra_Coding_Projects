@@ -1,102 +1,165 @@
 #include <string>
+#include <cctype>
 #include <iostream>
-#include <exception>
-#include <regex>
-using std::cout;
-using std::endl;
-using std::isspace, std::remove_if;
-using std::string, std::invalid_argument;
+#include <iomanip>
+#include <sstream>
+#include <stdexcept>
+#include <cmath>
 
+constexpr double MU_EARTH = 398600.4418; // km³/s²
+constexpr double R_EARTH = 6378.137;     // km
 
-int CalculateCheckSum(const string &Line){
+constexpr std::size_t LINE_LEN = 69; // Every TLE line must be exactly 69 chars
 
-    int sum = 0; 
+enum : std::size_t
+{
+    COL_CATALOG_START = 2,
+    COL_CATALOG_LEN = 5,
+    COL_INCL_START = 8,
+    COL_INCL_LEN = 8,
+    COL_ECC_START = 26,
+    COL_ECC_LEN = 7,
+    COL_MEANMO_START = 52,
+    COL_MEANMO_LEN = 11,
+    COL_CHECKSUM_POS = 68
+};
 
-    for (int i=0; i<68; i++){
-        if(isdigit(Line[i])){
-            sum+=Line[i] - '0';
-        }
-        else if(Line[i]=='-'){
-            sum+=1;
-        }
-    }
-    return sum % 10;
+// --- Strip CR/LF only ---
+std::string stripLineEndings(const std::string& line) {
+    std::string result;
+    for (char c : line)
+        if (c != '\r' && c != '\n')
+            result += c;
+    return result;
 }
 
+// --- Checksum validation with debug ---
+bool validateTLEChecksum(const std::string& raw) {
+    std::string line = stripLineEndings(raw);
+    std::cout << "Debug: validating line: [" << line << "]\n";
+    std::cout << "Debug: line length = " << line.length() << "\n";
 
-void ValidateTLE(string LineOne, string LineTwo)
-{
-
-    try
-    {
-        // std::regex LineOnePattern("^1 (\\d{5})([A-Z]) (\\d{2})(\\d{3})([A-Z]{0,3})   (\\d{2})(\\d{3}\\.\\d{8})  ([ +-]\\.\\d{8})  ([ 0-9]{5}[+-]\\d)  ([ 0-9]{5}[+-]\\d) (\\d)  (\\d{4})$");
-        // std::regex LineTwoPattern("^2 (\\d{5})  (\\d{1,3}\\.\\d{4}) (\\d{1,3}\\.\\d{4}) (\\d{7}) (\\d{1,3}\\.\\d{4}) (\\d{1,3}\\.\\d{4}) (\\d{1,2}\\.\\d{8})(\\d)$");
-
-        // if (!(std::regex_match(LineOne, LineOnePattern)))
-        // {
-        //     throw 404;
-        // }
-        // if (!(std::regex_match(LineTwo, LineTwoPattern)))
-        // {
-        //     throw 404;
-        // }
-       
-
-        //Make Sure The Catalog Numbers In The Two Lines Are The Same 
-        string cat1 = LineOne.substr(2,5), cat2=LineTwo.substr(2,5);
-        if(cat1 != cat2){
-            throw invalid_argument("The Catalog Numbers Are Not Equal"); 
-        }
-
-        // Make Sure The Angle is between 0 and 180 degrees
-        double IncAngle = stod(LineTwo.substr(8, 7));
-        if (IncAngle < 0.0 || IncAngle > 180.0)
-        {
-            throw invalid_argument("This is not a valid inclination angle! ");
-        }
-
-        // Make Sure the Eccentricity is between 0 and 1
-        string ecc_str = LineTwo.substr(26, 7);
-        double e = stod("0." + ecc_str);
-        if (e >= 1)
-        {
-            throw invalid_argument("This is not a valid (ellipse) eccentricity!");
-        }
-
-        // Make Sure The Checksum is a number between 0 and 9 (mod 10)
-        int expected = LineTwo[68] - '0';
-        int calculated=CalculateCheckSum(LineTwo);
-
-        if (calculated != expected)
-        {
-            throw invalid_argument("The checksum is invalid");
-        }
+    if (line.length() != LINE_LEN) {
+        std::cout << "Debug: Invalid line length!\n";
+        return false;
     }
-    catch (int e)
-    {
-        cout << "Error Code: " << e << endl;
+
+    int sum = 0;
+    for (std::size_t i = 0; i < COL_CHECKSUM_POS; ++i) {
+        char c = line[i];
+        if (std::isdigit(c))
+            sum += c - '0';
+        else if (c == '-')
+            sum += 1;
+        // everything else adds 0
     }
-    catch (invalid_argument &e)
-    {
-        cout << "Error: " << e.what() << endl;
+
+    int expected = line[COL_CHECKSUM_POS] - '0';
+    int computed = sum % 10;
+
+    std::cout << "Debug: expected checksum = " << expected
+              << ", computed checksum = " << computed << "\n";
+
+    if (computed != expected) {
+        std::cout << "Debug: checksum mismatch!\n";
+        return false;
     }
+
+    return true;
 }
 
-int main()
-{
+// --- Parse numeric fields ---
+double parseInclination(const std::string& line2) {
+    std::string str = line2.substr(COL_INCL_START, COL_INCL_LEN);
+    std::cout << "Debug: Inclination string = [" << str << "]\n";
+    return std::stod(str);
+}
 
-    string TLE_Name = "ISS (ZARYA)";
-    string TLE_Line_One = "1 25544U 98067A   08264.51782528 -.00002182  00000-0 -11606-4 0  2927";
-    string TLE_Line_Two = "2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391563537";
+double parseEccentricity(const std::string& line2) {
+    std::string eccStr = line2.substr(COL_ECC_START, COL_ECC_LEN);
+    std::cout << "Debug: Eccentricity string = [" << eccStr << "]\n";
 
-    ValidateTLE(TLE_Line_One, TLE_Line_Two);
+    uint64_t val = 0;
+    for (char c : eccStr) {
+        if (!std::isdigit(c)) {
+            std::cout << "Debug: Eccentricity has non-digit character!\n";
+            throw std::invalid_argument("Eccentricity contains non-digit characters");
+        }
+        val = val * 10 + (c - '0');
+    }
 
-    // Line 1: invalid catalog number, bad spacing
-string BadTLE_Line_One = "1 2554XU 98067A   08264.51782528 -.00002182  00000-0 -11606-4 0  292";  
+    double e = static_cast<double>(val) / 1'000'000.0;
+    std::cout << "Debug: Eccentricity value = " << e << "\n";
+    return e;
+}
 
-// Line 2: eccentricity >=1, inclination > 180°, checksum wrong
-string BadTLE_Line_Two = "2 25544  190.6416 247.4627 1234567 130.5360 325.0288 15.72125391563538";
+double parseMeanMotion(const std::string& line2) {
+    std::string str = line2.substr(COL_MEANMO_START, COL_MEANMO_LEN);
+    std::cout << "Debug: Mean motion string = [" << str << "]\n";
+    return std::stod(str);
+}
 
-    ValidateTLE(BadTLE_Line_One,BadTLE_Line_Two);
+// --- Validate TLE orbit ---
+bool validateTLEOrbit(const std::string& line1, const std::string& line2) {
+
+    std::cout << "Debug: Line1 = [" << line1 << "]\n";
+    std::cout << "Debug: Line2 = [" << line2 << "]\n";
+
+    if (!validateTLEChecksum(line1)) {
+        std::cout << "Debug: Line1 checksum failed!\n";
+        return false;
+    }
+    if (!validateTLEChecksum(line2)) {
+        std::cout << "Debug: Line2 checksum failed!\n";
+        return false;
+    }
+
+    try {
+        double incl = parseInclination(line2);
+        std::cout << "Debug: Inclination = " << incl << "\n";
+        if (incl < 0.0 || incl > 180.0) {
+            std::cout << "Debug: Inclination out of range!\n";
+            return false;
+        }
+
+        double ecc = parseEccentricity(line2);
+        if (ecc < 0.0 || ecc >= 1.0) {
+            std::cout << "Debug: Eccentricity out of range!\n";
+            return false;
+        }
+
+        double mm = parseMeanMotion(line2);
+        if (mm <= 0.0) {
+            std::cout << "Debug: Mean motion <= 0!\n";
+            return false;
+        }
+
+    } catch (const std::exception& e) {
+        std::cout << "Debug: Exception while parsing numeric fields: " << e.what() << "\n";
+        return false;
+    }
+
+    return true;
+}
+
+// --- Main ---
+int main() {
+    // Line too short
+std::string line1="1 53239U 22085A 26057.06690971 .00010434 00000+0 12875-3 0 9994";
+// Inclination negative
+std::string faulty_line2_mm_zero = "2 53239  41.4663 278.8535 0005884 197.5112 162.5524  0.00000000000000";
+    // std::cout << "Line 2 Valid: " << validateTLEChecksum(line2) << "\n";
+
+    bool ok =validateTLEOrbit(line1, faulty_line2_mm_zero);
+
+ if(ok)
+ {
+    std::cout<<"TLE VALID"<<"\n";
+ }
+ else
+ {
+    std::cout<<"TLE Invalid"<<"\n";
+ }
+
     return 0;
 }
